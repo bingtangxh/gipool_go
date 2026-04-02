@@ -61,10 +61,12 @@ func cls() {
 func readIntInRange(min, max int) int {
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		line, _ := reader.ReadString('\n')
+		line, err := reader.ReadString('\n')
+		if err != nil && line == "" {
+			return min
+		}
 		var n int
-		_, err := fmt.Sscanf(strings.TrimSpace(line), "%d", &n)
-		if err == nil && n >= min && n <= max {
+		if _, scanErr := fmt.Sscanf(strings.TrimSpace(line), "%d", &n); scanErr == nil && n >= min && n <= max {
 			return n
 		}
 		fmt.Printf("请输入 %d 到 %d 之间的数字: ", min, max)
