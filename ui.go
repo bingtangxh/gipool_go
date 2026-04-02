@@ -48,7 +48,9 @@ func getch() byte {
 	}
 	defer term.Restore(fd, oldState)
 	var buf [1]byte
-	os.Stdin.Read(buf[:])
+	if _, err := os.Stdin.Read(buf[:]); err != nil {
+		return 0
+	}
 	return buf[0]
 }
 

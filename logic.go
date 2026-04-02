@@ -47,12 +47,13 @@ func daysSinceSinglePoolEnds(pool WishPool) int {
 	}
 	endTime := makeTimeFromYMD(pool.EndY, pool.EndM, pool.EndD, hour, 0, 0)
 	diff := time.Since(endTime).Hours() / 24
-	// Round away from zero so that fractional days never collapse to 0:
-	// a pool that ended 12 hours ago returns 1, one that ends in 12 hours returns -1.
+	// Round away from zero: matches the original C behaviour of (int)diff ± 1.
+	// A pool that ended any fraction of a day ago returns at least 1.
+	// A pool that ends in the future returns at most -1.
 	if diff < 0 {
-		return int(diff) - 1
+		return int(math.Floor(diff))
 	} else if diff > 0 {
-		return int(diff) + 1
+		return int(math.Ceil(diff))
 	}
 	return 0
 }
