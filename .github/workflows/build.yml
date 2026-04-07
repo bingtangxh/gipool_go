@@ -91,9 +91,14 @@ jobs:
         with:
           pattern: binary-*
           path: dist
-          merge-multiple: true
+      
+      - name: Collect release binaries
+        run: |
+          mkdir -p release-assets
+          find dist -type f -exec cp {} release-assets/ \;
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: release-assets/*
+          overwrite_files: true
