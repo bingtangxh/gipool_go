@@ -91,9 +91,28 @@ jobs:
         with:
           pattern: binary-*
           path: dist
-          merge-multiple: true
+      
+      - name: Collect release binaries
+        run: |
+          mkdir -p release-assets
+          declare -A source_files
+          while IFS= read -r file; do
+            filename="$(basename "${file}")"
+            target="release-assets/${filename}"
+            if [ -n "${source_files[${filename}]:-}" ]; then
+              echo "duplicate release asset name '${filename}' from files '${source_files[${filename}]}' and '${file}'"
+              exit 1
+            fi
+            source_files["${filename}"]="${file}"
+            cp "${file}" "${target}"
+          done < <(find dist -type f | sort)
+          if ! find release-assets -type f | grep -q .; then
+            echo "no release assets collected"
+            exit 1
+          fi
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: release-assets/*
+          overwrite_files: true
