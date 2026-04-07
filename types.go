@@ -2,7 +2,7 @@ package main
 
 import "math"
 
-// Vision element types
+// 神之眼元素类型
 const (
 	VisionOther   = 0
 	Pyro          = 1
@@ -15,7 +15,7 @@ const (
 	VisionUnknown = 8
 )
 
-// Role attribute types
+// 角色属性类型
 const (
 	RoleTypeTravelerAether  = 0
 	RoleTypeTravelerLumine  = 1
@@ -27,13 +27,13 @@ const (
 	RoleTypeExcluded        = 256
 )
 
-// makePermanent5StarMeta encodes version info for permanent 5-stars that had UP events.
+// 将常驻 5 星的首次 UP 池信息编码
 func makePermanent5StarMeta(major, minor, half uint32) uint32 {
 	encoded := (major << 6) | ((minor & 0xF) << 2) | (half & 0x3)
 	return (encoded << 3) | 3
 }
 
-// CharEntry represents a Genshin Impact character.
+// CharEntry 表示一个原神角色
 type CharEntry struct {
 	ID     uint
 	NameCN string
@@ -50,7 +50,7 @@ func (c CharEntry) isLimitedOrUPFiveStar() bool {
 	return c.Attrib == RoleTypeLimitedFiveStar || (c.Attrib > 3 && c.Attrib%4 == 3)
 }
 
-// WishPool represents a single banner/wish pool version.
+// WishPool 表示单个卡池，存储具体角色、版本、上半下半和起止日期信息
 type WishPool struct {
 	Up5    [24]uint
 	Up4    [24]uint
@@ -66,7 +66,7 @@ type WishPool struct {
 	EndD   uint8
 }
 
-// PoolNode is a linked list node for a character's pool history.
+// PoolNode 用来表示单个卡池，作为链表节点，存储一个角色的所有 UP 历史
 type PoolNode struct {
 	Major uint8
 	Minor uint8
@@ -74,5 +74,5 @@ type PoolNode struct {
 	Next  *PoolNode
 }
 
-// minInt32 is used as a sentinel "never appeared in UP" value.
+// minInt32 表示该角色从未 UP
 const minInt32 = math.MinInt32
