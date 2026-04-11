@@ -9,6 +9,101 @@ import (
 	"golang.org/x/term"
 )
 
+const ansiReset = "\033[0m"
+
+// pool.Half >= 10 means chronicled/special mixed pools and uses different display layout.
+const poolHalfSpecialThreshold = 10
+const poolSplitLineWidth = 103
+const roleAttribUPMin = 3
+const roleAttribUPDivisor = 4
+const roleAttribUPRemainder = 3
+
+var poolSplitLine = strings.Repeat("-", poolSplitLineWidth)
+
+var visionColor = map[uint8]string{
+	VisionOther:   "\033[38;5;7m",
+	Pyro:          "\033[38;5;9m",
+	Hydro:         "\033[38;5;33m",
+	Anemo:         "\033[38;5;43m",
+	Electro:       "\033[38;5;99m",
+	Dendro:        "\033[38;5;46m",
+	Cryo:          "\033[38;5;159m",
+	Geo:           "\033[38;5;220m",
+	VisionUnknown: "\033[38;5;7m",
+}
+
+func colorizeByVision(vision uint8, text string) string {
+	if text == "" {
+		return text
+	}
+	color, ok := visionColor[vision]
+	if !ok {
+		color = visionColor[VisionOther]
+	}
+	return color + text + ansiReset
+}
+
+func visionName(vision uint8) string {
+	switch vision {
+	case Pyro:
+		return "Pyro"
+	case Hydro:
+		return "Hydro"
+	case Anemo:
+		return "Anemo"
+	case Electro:
+		return "Electro"
+	case Dendro:
+		return "Dendro"
+	case Cryo:
+		return "Cryo"
+	case Geo:
+		return "Geo"
+	case VisionOther:
+		return "Other"
+	default:
+		return "Unknown"
+	}
+}
+
+func roleTypeName(ch CharEntry) string {
+	switch {
+	case ch.isFourStar():
+		return "4-star"
+	case ch.Attrib == RoleTypeLimitedFiveStar:
+		return "Limited 5-star"
+	case isUPPermanentFiveStar(ch):
+		return "UP 5-star (permanent)"
+	case ch.Attrib == RoleTypeTravelerAether || ch.Attrib == RoleTypeTravelerLumine:
+		return "Traveler"
+	case ch.Attrib == RoleTypeCollab:
+		return "Collab"
+	default:
+		return "Other"
+	}
+}
+
+// isUPPermanentFiveStar identifies encoded permanent 5-star entries that had their own UP pool.
+func isUPPermanentFiveStar(ch CharEntry) bool {
+	return ch.Attrib > roleAttribUPMin && ch.Attrib%roleAttribUPDivisor == roleAttribUPRemainder
+}
+
+func padVisual(text string, width int) string {
+	padding := width - visualLen(text)
+	if padding <= 0 {
+		return text
+	}
+	return text + strings.Repeat(" ", padding)
+}
+
+func printColoredPadded(text string, vision uint8, width int) {
+	fmt.Print(colorizeByVision(vision, text))
+	padding := width - visualLen(text)
+	if padding > 0 {
+		fmt.Print(strings.Repeat(" ", padding))
+	}
+}
+
 // runeWidth returns the visual terminal width of a rune (2 for CJK/fullwidth, 1 otherwise).
 func runeWidth(r rune) int {
 	if r >= 0x1100 && r <= 0x115F ||
@@ -184,40 +279,87 @@ func charNameCN(id uint) string {
 	return charMap[id].NameCN
 }
 
+func charByID(id uint) (CharEntry, bool) {
+	index := int(id)
+	if index >= len(charMap) {
+		return CharEntry{}, false
+	}
+	return charMap[index], true
+}
+
 // printAllPools prints all wish pools with their version, dates, and character lists.
 func printAllPools() {
 	cls()
+	maxCNVisualLen := 0
+	for _, ch := range charMap {
+		if w := visualLen(ch.NameCN); w > maxCNVisualLen {
+			maxCNVisualLen = w
+		}
+	}
+	if maxCNVisualLen == 0 {
+		maxCNVisualLen = 1
+	}
+
 	for _, pool := range wishPool {
+		if pool.Half >= poolHalfSpecialThreshold {
+			fmt.Println(poolSplitLine)
+		}
 		fmt.Printf("%d.%d.%d\t%04d.%02d.%02d\t%04d.%02d.%02d\t",
 			pool.Major, pool.Minor, pool.Half,
 			pool.StartY, pool.StartM, pool.StartD,
 			pool.EndY, pool.EndM, pool.EndD)
 
-		first := true
+		fmt.Print(" | ")
+		up5 := make([]uint, 0, 2)
 		for _, id := range pool.Up5 {
 			if id == 0 {
 				break
 			}
-			if !first {
-				fmt.Print(", ")
-			}
-			fmt.Print(charNameCN(id))
-			first = false
+			up5 = append(up5, id)
 		}
-		fmt.Print("\t")
+		if pool.Half < poolHalfSpecialThreshold {
+			for i := 0; i < 2; i++ {
+				if i < len(up5) {
+					ch, ok := charByID(up5[i])
+					if !ok {
+						fmt.Print(strings.Repeat(" ", maxCNVisualLen+1))
+						fmt.Print(" | ")
+						continue
+					}
+					printColoredPadded(ch.NameCN, ch.Vision, maxCNVisualLen+1)
+				} else {
+					fmt.Print(strings.Repeat(" ", maxCNVisualLen+1))
+				}
+				fmt.Print(" | ")
+			}
+		} else {
+			for i, id := range up5 {
+				ch, ok := charByID(id)
+				if !ok {
+					continue
+				}
+				if i > 0 {
+					fmt.Print(" ")
+				}
+				fmt.Print(colorizeByVision(ch.Vision, ch.NameCN))
+			}
+			fmt.Print(" | ")
+		}
 
-		first = true
 		for _, id := range pool.Up4 {
 			if id == 0 {
 				break
 			}
-			if !first {
-				fmt.Print(", ")
+			ch, ok := charByID(id)
+			if !ok {
+				continue
 			}
-			fmt.Print(charNameCN(id))
-			first = false
+			printColoredPadded(ch.NameCN, ch.Vision, maxCNVisualLen+1)
 		}
 		fmt.Println()
+		if pool.Half >= poolHalfSpecialThreshold {
+			fmt.Println(poolSplitLine)
+		}
 	}
 	fmt.Print("\n按回车继续...")
 	getch()
@@ -226,13 +368,30 @@ func printAllPools() {
 // printDaysofAllLimited5StarCharacters prints days since last UP for limited 5-star characters.
 func printDaysofAllLimited5StarCharacters() {
 	cls()
+	maxCN := 0
+	maxEN := 0
+	for _, ch := range charMap {
+		if !ch.isLimitedOrUPFiveStar() {
+			continue
+		}
+		if w := visualLen(ch.NameCN); w > maxCN {
+			maxCN = w
+		}
+		if w := visualLen(ch.Name); w > maxEN {
+			maxEN = w
+		}
+	}
+
 	for _, idx := range arrangedInOrderOfDays {
 		ch := charMap[idx]
 		days := daysPassedSinceLastUP[idx]
 		if days == minInt32 || !ch.isLimitedOrUPFiveStar() {
 			continue
 		}
-		fmt.Printf("%-12s %-20s %d 天\n", ch.NameCN, ch.Name, days)
+		printColoredPadded(ch.NameCN, ch.Vision, maxCN+1)
+		fmt.Print(" ")
+		printColoredPadded(ch.Name, ch.Vision, maxEN+1)
+		fmt.Printf(" %d 天\n", days)
 	}
 	fmt.Print("\n按回车继续...")
 	getch()
@@ -271,9 +430,20 @@ func choiceCharFromList(indices []int) int {
 	}
 
 	items := make([]string, len(indices)+1)
+	maxCN := 0
+	maxEN := 0
+	for _, idx := range indices {
+		ch := charMap[idx]
+		if w := visualLen(ch.NameCN); w > maxCN {
+			maxCN = w
+		}
+		if w := visualLen(ch.Name); w > maxEN {
+			maxEN = w
+		}
+	}
 	for i, idx := range indices {
 		ch := charMap[idx]
-		items[i] = fmt.Sprintf("%-8s %s", ch.NameCN, ch.Name)
+		items[i] = padVisual(ch.NameCN, maxCN+1) + " " + padVisual(ch.Name, maxEN+1)
 	}
 	items[len(indices)] = "返回"
 
@@ -414,7 +584,20 @@ func showMainMenu() {
 				buildPoolLinkList(idx)
 				cls()
 				ch := charMap[idx]
-				fmt.Printf("角色: %s (%s)\n", ch.NameCN, ch.Name)
+				labels := []string{"角色编号", "中文名", "英文名", "神之眼", "角色类型"}
+				maxLabel := 0
+				for _, lb := range labels {
+					if w := visualLen(lb); w > maxLabel {
+						maxLabel = w
+					}
+				}
+				fmt.Printf("%s : %d\n", padVisual(labels[0], maxLabel), idx)
+				fmt.Printf("%s : ", padVisual(labels[1], maxLabel))
+				fmt.Println(colorizeByVision(ch.Vision, ch.NameCN))
+				fmt.Printf("%s : ", padVisual(labels[2], maxLabel))
+				fmt.Println(colorizeByVision(ch.Vision, ch.Name))
+				fmt.Printf("%s : %s\n", padVisual(labels[3], maxLabel), visionName(ch.Vision))
+				fmt.Printf("%s : %s\n", padVisual(labels[4], maxLabel), roleTypeName(ch))
 				fmt.Printf("卡池历史:\n")
 				printPoolLinkList(poolLinkLists[idx])
 				fmt.Print("\n按回车继续...")
