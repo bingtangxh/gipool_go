@@ -64,15 +64,16 @@ func cynoJoke() {
 		joke := jokes[idx]
 		cls()
 		fmt.Println(joke.Question)
-		fmt.Print("\n按回车查看答案...")
-		getch()
-
+		fmt.Println()
 		if joke.Answer != "" {
+			fmt.Println("Press ENTER to see the answer...")
+			getch()
 			fmt.Println()
 			fmt.Println(joke.Answer)
+			fmt.Println()
 		}
 
-		fmt.Print("\n按回车继续，输入其他键后回车返回...")
+		fmt.Print("Press ENTER to continue, or any other key followed by ENTER to go back...")
 		b := getch()
 		if b != '\r' && b != '\n' {
 			return

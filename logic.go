@@ -22,7 +22,7 @@ func initDynamicThings() {
 	arrangeByDaysPassedSinceLastUp()
 }
 
-// poolEndHour returns the hour (local time) at which a pool ends based on its half value.
+// poolEndHour 根据池子的 half 值返回该池子结束的本地时间（小时）。
 func poolEndHour(half uint8) int {
 	switch half % 10 {
 	case 1:
@@ -47,9 +47,7 @@ func daysSinceSinglePoolEnds(pool WishPool) int {
 	}
 	endTime := makeTimeFromYMD(pool.EndY, pool.EndM, pool.EndD, hour, 0, 0)
 	diff := time.Since(endTime).Hours() / 24
-	// Round away from zero: matches the original C behaviour of (int)diff ± 1.
-	// A pool that ended any fraction of a day ago returns at least 1.
-	// A pool that ends in the future returns at most -1.
+	// 向绝对值更大的方向取整，任意在一天内结束的池子，最低返回 1；未来结束的池子，最高返回 -1。
 	if diff < 0 {
 		return int(math.Floor(diff))
 	} else if diff > 0 {
